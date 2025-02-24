@@ -9,30 +9,33 @@ const io = socketIo(server);
 app.use(express.static("public"));
 
 io.on("connection", (socket) => {
-    console.log("New user connected");
+    console.log("New user connected:", socket.id);
 
-    socket.on("join-room", () => {
-        socket.broadcast.emit("user-connected", socket.id);
+    socket.on("join-room", (roomId) => {
+        socket.join(roomId);
+        socket.broadcast.to(roomId).emit("user-connected", socket.id);
     });
 
-    socket.on("offer", (offer) => {
-        socket.broadcast.emit("offer", offer);
+    socket.on("offer", (roomId, offer) => {
+        socket.broadcast.to(roomId).emit("offer", offer, socket.id);
     });
 
-    socket.on("answer", (answer) => {
-        socket.broadcast.emit("answer", answer);
+    socket.on("answer", (roomId, answer) => {
+        socket.broadcast.to(roomId).emit("answer", answer, socket.id);
     });
 
-    socket.on("candidate", (candidate) => {
-        socket.broadcast.emit("candidate", candidate);
+    socket.on("candidate", (roomId, candidate) => {
+        socket.broadcast.to(roomId).emit("candidate", candidate, socket.id);
+    });
+
+    socket.on("chat-message", (roomId, message) => {
+        socket.broadcast.to(roomId).emit("chat-message", "User", message);
     });
 
     socket.on("disconnect", () => {
-        socket.broadcast.emit("user-disconnected", socket.id);
+        io.emit("user-disconnected", socket.id);
     });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
