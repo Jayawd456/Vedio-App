@@ -1,4 +1,5 @@
-const socket = io();
+const socket = io("https://vedio-app-k92u.onrender.com"); // Replace with your deployed server URL
+
 let localStream;
 let peerConnections = {};
 const videoGrid = document.getElementById("video-grid");
@@ -7,7 +8,21 @@ const chatInput = document.getElementById("chatInput");
 const sendButton = document.getElementById("sendButton");
 const roomId = "myRoom"; // Static room
 
-const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+//const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+const config = {
+    iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },  // Free STUN server
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun3.l.google.com:19302" },
+        { urls: "stun:stun4.l.google.com:19302" },
+        {
+            urls: "turn:your-turn-server.com",
+            username: "your-username",
+            credential: "your-password"
+        } // Replace with a paid TURN server if needed
+    ]
+};
 
 // Start Camera
 async function startCamera() {
