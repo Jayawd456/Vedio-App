@@ -2,10 +2,8 @@ const socket = io("https://vedio-app-k92u.onrender.com"); // Your server URL
 
 let localStream;
 let peerConnections = {};
-let userCount = 0; // Track the number of connected users
 
 const MAX_USERS = 4; // Limit to 4 users
-
 const videoGrid = document.getElementById("video-grid");
 const chatBox = document.getElementById("chatBox");
 const chatInput = document.getElementById("chatInput");
@@ -16,7 +14,7 @@ const toggleMicBtn = document.getElementById("toggleMic");
 const toggleVideoBtn = document.getElementById("toggleVideo");
 const endCallBtn = document.getElementById("endCall");
 
-const roomId = "myRoom"; // Static room for now
+const roomId = "myRoom";
 
 const config = {
     iceServers: [
@@ -24,41 +22,25 @@ const config = {
         { urls: "stun:stun1.l.google.com:19302" },
         { urls: "stun:stun2.l.google.com:19302" },
         { urls: "stun:stun3.l.google.com:19302" },
-        { urls: "stun:stun4.l.google.com:19302" },
-        {
-            urls: "turn:your-turn-server.com",
-            username: "your-username",
-            credential: "your-password"
-        } // Replace with your TURN server
+        { urls: "stun:stun4.l.google.com" }
     ]
 };
 
-// 🎥 Start Camera & Join Room
+// Start Camera & Join Room
 async function startCamera() {
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         addVideoStream("local", localStream);
-        socket.emit("check-user-count", roomId); // Check room capacity before joining
+        socket.emit("join-room", roomId);
     } catch (error) {
         console.error("Error accessing camera/microphone:", error);
         alert("Failed to access camera/microphone. Please check permissions.");
     }
 }
 
-// 📡 Receive user count from server before joining
-socket.on("user-count", (count) => {
-    userCount = count;
-    if (userCount >= MAX_USERS) {
-        alert("Room is full! You cannot join at this time.");
-        socket.disconnect();
-        return;
-    }
-    socket.emit("join-room", roomId);
-});
-
-// 📹 Add Video Stream
+// Add Video Stream
 function addVideoStream(id, stream) {
-    if (!document.getElementById(id)) { // Prevent duplicate videos
+    if (!document.getElementById(id)) {
         let video = document.createElement("video");
         video.srcObject = stream;
         video.autoplay = true;
@@ -67,33 +49,8 @@ function addVideoStream(id, stream) {
     }
 }
 
-// 🎤 Toggle Mic
-toggleMicBtn.onclick = () => {
-    const audioTrack = localStream.getAudioTracks()[0];
-    audioTrack.enabled = !audioTrack.enabled;
-    toggleMicBtn.innerHTML = audioTrack.enabled ? "Mute" : "Unmute";
-};
-
-// 🎥 Toggle Video
-toggleVideoBtn.onclick = () => {
-    const videoTrack = localStream.getVideoTracks()[0];
-    videoTrack.enabled = !videoTrack.enabled;
-    toggleVideoBtn.innerHTML = videoTrack.enabled ? "Stop Video" : "Start Video";
-};
-
-// ❌ End Call
-endCallBtn.onclick = () => {
-    Object.values(peerConnections).forEach(pc => pc.close());
-    socket.disconnect();
-    videoGrid.innerHTML = "";
-};
-
-// 📡 Handle User Connection
+// Handle User Connection
 socket.on("user-connected", (userId) => {
-    if (Object.keys(peerConnections).length >= MAX_USERS - 1) {
-        return; // Prevent more than 4 users
-    }
-
     const peerConnection = new RTCPeerConnection(config);
     peerConnections[userId] = peerConnection;
 
@@ -116,10 +73,8 @@ socket.on("user-connected", (userId) => {
     });
 });
 
-// 🎥 Handle Incoming Offer
+// Handle Offer
 socket.on("offer", (offer, userId) => {
-    if (peerConnections[userId]) return; // Avoid duplicate users
-
     const peerConnection = new RTCPeerConnection(config);
     peerConnections[userId] = peerConnection;
 
@@ -144,17 +99,17 @@ socket.on("offer", (offer, userId) => {
     });
 });
 
-// 📡 Handle Answer
+// Handle Answer
 socket.on("answer", (answer, userId) => {
     peerConnections[userId]?.setRemoteDescription(new RTCSessionDescription(answer));
 });
 
-// 📡 Handle ICE Candidates
+// Handle ICE Candidates
 socket.on("candidate", (candidate, userId) => {
     peerConnections[userId]?.addIceCandidate(new RTCIceCandidate(candidate));
 });
 
-// ❌ Handle User Disconnect
+// Handle User Disconnect
 socket.on("user-disconnected", (userId) => {
     if (peerConnections[userId]) {
         peerConnections[userId].close();
@@ -163,7 +118,28 @@ socket.on("user-disconnected", (userId) => {
     }
 });
 
-// 💬 Chat Feature
+// Toggle Mic
+toggleMicBtn.onclick = () => {
+    const audioTrack = localStream.getAudioTracks()[0];
+    audioTrack.enabled = !audioTrack.enabled;
+    toggleMicBtn.innerHTML = audioTrack.enabled ? "Mute" : "Unmute";
+};
+
+// Toggle Video
+toggleVideoBtn.onclick = () => {
+    const videoTrack = localStream.getVideoTracks()[0];
+    videoTrack.enabled = !videoTrack.enabled;
+    toggleVideoBtn.innerHTML = videoTrack.enabled ? "Stop Video" : "Start Video";
+};
+
+// End Call
+endCallBtn.onclick = () => {
+    Object.values(peerConnections).forEach(pc => pc.close());
+    socket.disconnect();
+    videoGrid.innerHTML = "";
+};
+
+// Chat Feature
 sendButton.onclick = () => {
     const message = chatInput.value;
     if (message.trim() !== "") {
@@ -177,12 +153,12 @@ socket.on("chat-message", (user, message) => {
     addChatMessage(user, message);
 });
 
-// 📨 Display Chat Messages
+// Display Chat Messages
 function addChatMessage(user, message) {
     let msgElement = document.createElement("p");
     msgElement.innerHTML = `<strong>${user}:</strong> ${message}`;
     chatBox.appendChild(msgElement);
-    chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll
+    chatBox.scrollTop = chatBox.scrollHeight;
 }
 
 startCamera();
