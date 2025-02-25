@@ -3,79 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Call</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Video Call with Chat</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script defer src="script.js"></script>
+    <style>
+        #video-grid { display: flex; gap: 10px; }
+        video { width: 200px; border: 2px solid black; }
+        #chatBox { border: 1px solid #ccc; height: 200px; overflow-y: auto; padding: 5px; }
+    </style>
 </head>
 <body>
+    <h2>Video Call</h2>
+    <div id="video-grid"></div>
 
-    <div class="video-call-container">
-        <!-- Header -->
-        <div class="header">
-            <h2>[Internal] Weekly Report Marketing + Sales</h2>
-            <div class="meeting-info">
-                <span class="participants-count">+9</span>
-                <span class="meeting-link">cem-jmnt-hsu</span>
-                <span class="moderator">Adam Joseph</span>
-            </div>
-        </div>
-
-        <!-- Video Section -->
-        <div class="video-section">
-            <div class="main-video">
-                <video id="mainVideo" autoplay playsinline></video>
-                <div class="video-label">Adam Joseph</div>
-            </div>
-            <div class="participant-videos">
-                <div class="participant">
-                    <video autoplay muted playsinline></video>
-                    <div class="video-label">Cassie Jung</div>
-                </div>
-                <div class="participant">
-                    <video autoplay playsinline></video>
-                    <div class="video-label">Alice Wong</div>
-                </div>
-                <div class="participant">
-                    <video autoplay playsinline></video>
-                    <div class="video-label">Theresa Webb</div>
-                </div>
-                <div class="participant">
-                    <video autoplay playsinline></video>
-                    <div class="video-label">Christian Wong</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <div class="participants-list">
-                <h3>Participants</h3>
-                <div class="participant-name">Dianne Russell</div>
-                <div class="participant-name">Guy Hawkins</div>
-                <div class="participant-name">Kathryn Murphy</div>
-            </div>
-            <div class="chat-section">
-                <h3>Chats</h3>
-                <div class="chat-message">
-                    <strong>Kathryn Murphy:</strong> Good afternoon, everyone.
-                </div>
-                <div class="chat-message">
-                    <strong>Joshua Abraham:</strong> Yes, Let's start this meeting.
-                </div>
-            </div>
-        </div>
-
-        <!-- Controls -->
-        <div class="controls">
-            <button class="control-btn">🎤</button>
-            <button class="control-btn">📷</button>
-            <button class="control-btn">🔴</button>
-            <button class="control-btn">💬</button>
-            <button class="control-btn end-call">End Call</button>
-        </div>
-    </div>
-
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-<script src="script.js"></script>
-
+    <h2>Chat</h2>
+    <div id="chatBox"></div>
+    <input type="text" id="chatInput" placeholder="Type message..." />
+    <button id="sendButton">Send</button>
 </body>
 </html>
