@@ -10,6 +10,31 @@ const sendButton = document.querySelector("#sendButton");
 const participantsList = document.querySelector(".participants-list");
 const roomId = "myRoom"; // Static room ID
 
+document.addEventListener("DOMContentLoaded", function () {
+    const sendButton = document.getElementById("sendButton");
+
+    if (!sendButton) {
+        console.error("sendButton not found in DOM!");
+        return;
+    }
+
+    sendButton.onclick = () => {
+        const chatInput = document.getElementById("chatInput");
+        const chatBox = document.getElementById("chatBox");
+
+        if (!chatInput || !chatBox) {
+            console.error("Chat input or chat box not found.");
+            return;
+        }
+
+        const message = chatInput.value;
+        socket.emit("chat-message", roomId, message);
+        addChatMessage("You", message);
+        chatInput.value = "";
+    };
+});
+
+
 const config = {
     iceServers: [
         { urls: "stun:stun.l.google.com:19302" },  // Free STUN servers
