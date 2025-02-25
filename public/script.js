@@ -2,6 +2,9 @@ const socket = io("https://vedio-app-k92u.onrender.com"); // Your server URL
 
 let localStream;
 let peerConnections = {};
+let userCount = 0; // Track the number of connected users
+
+const MAX_USERS = 4; // Limit to 4 users
 
 const videoGrid = document.getElementById("video-grid");
 const chatBox = document.getElementById("chatBox");
@@ -35,20 +38,33 @@ async function startCamera() {
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         addVideoStream("local", localStream);
-        socket.emit("join-room", roomId);
+        socket.emit("check-user-count", roomId); // Check room capacity before joining
     } catch (error) {
         console.error("Error accessing camera/microphone:", error);
         alert("Failed to access camera/microphone. Please check permissions.");
     }
 }
 
+// 📡 Receive user count from server before joining
+socket.on("user-count", (count) => {
+    userCount = count;
+    if (userCount >= MAX_USERS) {
+        alert("Room is full! You cannot join at this time.");
+        socket.disconnect();
+        return;
+    }
+    socket.emit("join-room", roomId);
+});
+
 // 📹 Add Video Stream
 function addVideoStream(id, stream) {
-    let video = document.createElement("video");
-    video.srcObject = stream;
-    video.autoplay = true;
-    video.setAttribute("id", id);
-    videoGrid.appendChild(video);
+    if (!document.getElementById(id)) { // Prevent duplicate videos
+        let video = document.createElement("video");
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.setAttribute("id", id);
+        videoGrid.appendChild(video);
+    }
 }
 
 // 🎤 Toggle Mic
@@ -74,6 +90,10 @@ endCallBtn.onclick = () => {
 
 // 📡 Handle User Connection
 socket.on("user-connected", (userId) => {
+    if (Object.keys(peerConnections).length >= MAX_USERS - 1) {
+        return; // Prevent more than 4 users
+    }
+
     const peerConnection = new RTCPeerConnection(config);
     peerConnections[userId] = peerConnection;
 
@@ -98,6 +118,8 @@ socket.on("user-connected", (userId) => {
 
 // 🎥 Handle Incoming Offer
 socket.on("offer", (offer, userId) => {
+    if (peerConnections[userId]) return; // Avoid duplicate users
+
     const peerConnection = new RTCPeerConnection(config);
     peerConnections[userId] = peerConnection;
 
@@ -124,12 +146,12 @@ socket.on("offer", (offer, userId) => {
 
 // 📡 Handle Answer
 socket.on("answer", (answer, userId) => {
-    peerConnections[userId].setRemoteDescription(new RTCSessionDescription(answer));
+    peerConnections[userId]?.setRemoteDescription(new RTCSessionDescription(answer));
 });
 
 // 📡 Handle ICE Candidates
 socket.on("candidate", (candidate, userId) => {
-    peerConnections[userId].addIceCandidate(new RTCIceCandidate(candidate));
+    peerConnections[userId]?.addIceCandidate(new RTCIceCandidate(candidate));
 });
 
 // ❌ Handle User Disconnect
