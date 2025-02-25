@@ -1,4 +1,4 @@
-const socket = io("https://your-public-server-url.com"); // Replace with your deployed server URL
+const socket = io("https://vedio-app-k92u.onrender.com"); // Replace with your deployed server URL
 
 let localStream;
 let peerConnections = {};
