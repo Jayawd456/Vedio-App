@@ -1,4 +1,5 @@
-const socket = io();
+const socket = io("https://your-public-server-url.com"); // Replace with your deployed server URL
+
 let localStream;
 let peerConnections = {};
 const videoGrid = document.getElementById("video-grid");
