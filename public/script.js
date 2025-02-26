@@ -9,10 +9,17 @@ const chatInput = document.getElementById("chatInput");
 const sendButton = document.getElementById("sendButton");
 
 // Call Controls
-const toggleMicBtn = document.getElementById("toggleMic");
-const toggleVideoBtn = document.getElementById("toggleVideo");
-const shareScreenBtn = document.getElementById("shareScreen");
-const endCallBtn = document.getElementById("endCall");
+document.addEventListener("DOMContentLoaded", () => {
+    // Now the elements exist before JavaScript tries to use them
+    const toggleMicBtn = document.getElementById("toggleMic");
+    const toggleVideoBtn = document.getElementById("toggleVideo");
+    const shareScreenBtn = document.getElementById("shareScreen");
+    const endCallBtn = document.getElementById("endCall");
+
+    if (!toggleMicBtn || !toggleVideoBtn || !shareScreenBtn || !endCallBtn) {
+        console.error("Some buttons were not found! Check your HTML IDs.");
+        return;
+    }
 
 const roomId = "myRoom";
 
@@ -122,17 +129,17 @@ socket.on("user-disconnected", (userId) => {
 
 // Toggle Mic
 toggleMicBtn.onclick = () => {
-    const audioTrack = localStream.getAudioTracks()[0];
-    audioTrack.enabled = !audioTrack.enabled;
-    toggleMicBtn.innerHTML = audioTrack.enabled ? "Mute" : "Unmute";
-};
+        const audioTrack = localStream.getAudioTracks()[0];
+        audioTrack.enabled = !audioTrack.enabled;
+        toggleMicBtn.innerHTML = audioTrack.enabled ? "Mute" : "Unmute";
+    };
 
 // Toggle Video
 toggleVideoBtn.onclick = () => {
-    const videoTrack = localStream.getVideoTracks()[0];
-    videoTrack.enabled = !videoTrack.enabled;
-    toggleVideoBtn.innerHTML = videoTrack.enabled ? "Stop Video" : "Start Video";
-};
+        const videoTrack = localStream.getVideoTracks()[0];
+        videoTrack.enabled = !videoTrack.enabled;
+        toggleVideoBtn.innerHTML = videoTrack.enabled ? "Stop Video" : "Start Video";
+    };
 
 // Share Screen
 shareScreenBtn.onclick = async () => {
@@ -165,10 +172,10 @@ shareScreenBtn.onclick = async () => {
 
 // End Call
 endCallBtn.onclick = () => {
-    Object.values(peerConnections).forEach(pc => pc.close());
-    socket.disconnect();
-    videoGrid.innerHTML = "";
-};
+        Object.values(peerConnections).forEach(pc => pc.close());
+        socket.disconnect();
+        videoGrid.innerHTML = "";
+    };
 
 // Chat Feature
 sendButton.onclick = () => {
