@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function addVideoStream(id, stream) {
         let existingVideo = document.getElementById(id);
-        if (existingVideo) return; // Prevent duplicate video elements
+        if (existingVideo) return; // Prevent duplicates
 
         let video = document.createElement("video");
         video.srcObject = stream;
@@ -47,7 +47,7 @@ document.addEventListener("DOMContentLoaded", () => {
         videoGrid.appendChild(video);
     }
 
-    function connectToNewUser(userId, offer = null) {
+    function connectToNewUser(userId) {
         if (peerConnections[userId]) return; // Prevent duplicate connections
 
         const peerConnection = new RTCPeerConnection(config);
@@ -67,64 +67,46 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         };
 
-        if (offer) {
-            peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
-                .then(() => peerConnection.createAnswer())
-                .then(answer => peerConnection.setLocalDescription(answer))
-                .then(() => {
-                    socket.emit("answer", roomId, peerConnection.localDescription, userId);
-                });
-        } else {
-            peerConnection.createOffer()
-                .then(offer => peerConnection.setLocalDescription(offer))
-                .then(() => {
-                    socket.emit("offer", roomId, peerConnection.localDescription, socket.id);
-                });
-        }
+        peerConnection.createOffer()
+            .then(offer => peerConnection.setLocalDescription(offer))
+            .then(() => {
+                socket.emit("offer", roomId, peerConnection.localDescription, socket.id);
+            });
     }
 
-    socket.on("user-connected", (userId) => {
-        connectToNewUser(userId);
-    });
+    socket.on("user-connected", (userId) => connectToNewUser(userId));
 
     socket.on("offer", (offer, userId) => {
-        connectToNewUser(userId, offer);
+        const peerConnection = new RTCPeerConnection(config);
+        peerConnections[userId] = peerConnection;
+
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+        peerConnection.ontrack = (event) => {
+            addVideoStream(userId, event.streams[0]);
+        };
+
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                socket.emit("candidate", roomId, event.candidate, userId);
+            }
+        };
+
+        peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
+            .then(() => peerConnection.createAnswer())
+            .then(answer => peerConnection.setLocalDescription(answer))
+            .then(() => {
+                socket.emit("answer", roomId, peerConnection.localDescription, userId);
+            });
+    });
+
+    socket.on("answer", (answer, userId) => {
+        peerConnections[userId]?.setRemoteDescription(new RTCSessionDescription(answer));
     });
 
     socket.on("candidate", (candidate, userId) => {
-    if (peerConnections[userId]) {
-        if (peerConnections[userId].remoteDescription) {
-            // ✅ Add candidate only if remote description is set
-            peerConnections[userId].addIceCandidate(new RTCIceCandidate(candidate))
-                .catch(error => console.error("Error adding ICE candidate:", error));
-        } else {
-            // ✅ Store the candidate if remote description is not set yet
-            if (!peerConnections[userId].pendingCandidates) {
-                peerConnections[userId].pendingCandidates = [];
-            }
-            peerConnections[userId].pendingCandidates.push(candidate);
-        }
-    }
-});
-
-// ✅ Apply pending candidates after setting remote description
-socket.on("answer", (answer, userId) => {
-    if (peerConnections[userId]) {
-        peerConnections[userId].setRemoteDescription(new RTCSessionDescription(answer))
-            .then(() => {
-                // ✅ Add stored ICE candidates
-                if (peerConnections[userId].pendingCandidates) {
-                    peerConnections[userId].pendingCandidates.forEach(candidate => {
-                        peerConnections[userId].addIceCandidate(new RTCIceCandidate(candidate))
-                            .catch(error => console.error("Error adding stored ICE candidate:", error));
-                    });
-                    peerConnections[userId].pendingCandidates = [];
-                }
-            })
-            .catch(error => console.error("Error setting remote description:", error));
-    }
-});
-
+        peerConnections[userId]?.addIceCandidate(new RTCIceCandidate(candidate));
+    });
 
     socket.on("user-disconnected", (userId) => {
         if (peerConnections[userId]) {
