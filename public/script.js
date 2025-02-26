@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function addVideoStream(id, stream) {
         let existingVideo = document.getElementById(id);
-        if (existingVideo) return; // Prevent duplicates
+        if (existingVideo) return; // Prevent duplicate video elements
 
         let video = document.createElement("video");
         video.srcObject = stream;
@@ -47,7 +47,7 @@ document.addEventListener("DOMContentLoaded", () => {
         videoGrid.appendChild(video);
     }
 
-    function connectToNewUser(userId) {
+    function connectToNewUser(userId, offer = null) {
         if (peerConnections[userId]) return; // Prevent duplicate connections
 
         const peerConnection = new RTCPeerConnection(config);
@@ -67,37 +67,28 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         };
 
-        peerConnection.createOffer()
-            .then(offer => peerConnection.setLocalDescription(offer))
-            .then(() => {
-                socket.emit("offer", roomId, peerConnection.localDescription, socket.id);
-            });
+        if (offer) {
+            peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
+                .then(() => peerConnection.createAnswer())
+                .then(answer => peerConnection.setLocalDescription(answer))
+                .then(() => {
+                    socket.emit("answer", roomId, peerConnection.localDescription, userId);
+                });
+        } else {
+            peerConnection.createOffer()
+                .then(offer => peerConnection.setLocalDescription(offer))
+                .then(() => {
+                    socket.emit("offer", roomId, peerConnection.localDescription, socket.id);
+                });
+        }
     }
 
-    socket.on("user-connected", (userId) => connectToNewUser(userId));
+    socket.on("user-connected", (userId) => {
+        connectToNewUser(userId);
+    });
 
     socket.on("offer", (offer, userId) => {
-        const peerConnection = new RTCPeerConnection(config);
-        peerConnections[userId] = peerConnection;
-
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-        peerConnection.ontrack = (event) => {
-            addVideoStream(userId, event.streams[0]);
-        };
-
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket.emit("candidate", roomId, event.candidate, userId);
-            }
-        };
-
-        peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
-            .then(() => peerConnection.createAnswer())
-            .then(answer => peerConnection.setLocalDescription(answer))
-            .then(() => {
-                socket.emit("answer", roomId, peerConnection.localDescription, userId);
-            });
+        connectToNewUser(userId, offer);
     });
 
     socket.on("answer", (answer, userId) => {
