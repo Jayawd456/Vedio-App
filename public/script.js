@@ -37,18 +37,24 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     function addVideoStream(id, stream) {
-        let existingVideo = document.getElementById(id);
-        if (!existingVideo) {
-            let video = document.createElement("video");
-            video.srcObject = stream;
-            video.autoplay = true;
-            video.setAttribute("id", id);
-            videoGrid.appendChild(video);
-        }
+    let existingVideo = document.getElementById(id);
+    if (existingVideo) return; // Prevent duplicates
+
+    let video = document.createElement("video");
+    video.srcObject = stream;
+    video.autoplay = true;
+    video.setAttribute("id", id);
+    videoGrid.appendChild(video);
+}
+
     }
     
     function connectToNewUser(userId) {
-        const peerConnection = new RTCPeerConnection(config);
+    if (peerConnections[userId]) return; // Prevent duplicate connections
+
+    const peerConnection = new RTCPeerConnection(config);
+    peerConnections[userId] = peerConnection;
+
         peerConnections[userId] = peerConnection;
         
         localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
@@ -74,6 +80,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     socket.on("user-connected", (userId) => connectToNewUser(userId));
+
+
     
     socket.on("offer", (offer, userId) => {
         const peerConnection = new RTCPeerConnection(config);
@@ -112,13 +120,14 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
     
-    socket.on("user-disconnected", (userId) => {
-        if (peerConnections[userId]) {
-            peerConnections[userId].close();
-            delete peerConnections[userId];
-            document.getElementById(userId)?.remove();
-        }
-    });
+   socket.on("user-disconnected", (userId) => {
+    if (peerConnections[userId]) {
+        peerConnections[userId].close();
+        delete peerConnections[userId];
+        document.getElementById(userId)?.remove();
+    }
+});
+
     
     toggleMicBtn.onclick = () => {
         if (localStream) {
