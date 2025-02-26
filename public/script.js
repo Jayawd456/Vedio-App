@@ -91,13 +91,40 @@ document.addEventListener("DOMContentLoaded", () => {
         connectToNewUser(userId, offer);
     });
 
-    socket.on("answer", (answer, userId) => {
-        peerConnections[userId]?.setRemoteDescription(new RTCSessionDescription(answer));
-    });
-
     socket.on("candidate", (candidate, userId) => {
-        peerConnections[userId]?.addIceCandidate(new RTCIceCandidate(candidate));
-    });
+    if (peerConnections[userId]) {
+        if (peerConnections[userId].remoteDescription) {
+            // ✅ Add candidate only if remote description is set
+            peerConnections[userId].addIceCandidate(new RTCIceCandidate(candidate))
+                .catch(error => console.error("Error adding ICE candidate:", error));
+        } else {
+            // ✅ Store the candidate if remote description is not set yet
+            if (!peerConnections[userId].pendingCandidates) {
+                peerConnections[userId].pendingCandidates = [];
+            }
+            peerConnections[userId].pendingCandidates.push(candidate);
+        }
+    }
+});
+
+// ✅ Apply pending candidates after setting remote description
+socket.on("answer", (answer, userId) => {
+    if (peerConnections[userId]) {
+        peerConnections[userId].setRemoteDescription(new RTCSessionDescription(answer))
+            .then(() => {
+                // ✅ Add stored ICE candidates
+                if (peerConnections[userId].pendingCandidates) {
+                    peerConnections[userId].pendingCandidates.forEach(candidate => {
+                        peerConnections[userId].addIceCandidate(new RTCIceCandidate(candidate))
+                            .catch(error => console.error("Error adding stored ICE candidate:", error));
+                    });
+                    peerConnections[userId].pendingCandidates = [];
+                }
+            })
+            .catch(error => console.error("Error setting remote description:", error));
+    }
+});
+
 
     socket.on("user-disconnected", (userId) => {
         if (peerConnections[userId]) {
