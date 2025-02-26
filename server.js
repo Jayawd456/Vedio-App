@@ -5,65 +5,46 @@ const cors = require("cors");
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, { cors: { origin: "*" } }); // Allow all connections
+const io = socketIo(server, { cors: { origin: "*" } });
 
 app.use(cors());
 app.use(express.static("public"));
 
-const MAX_USERS = 4; // Limit to 4 users per room
 const usersInRoom = {}; // Track users in each room
 
 io.on("connection", (socket) => {
     console.log("New user connected:", socket.id);
 
-    // Check the current user count in the room before joining
-    socket.on("check-user-count", (roomId) => {
-        const count = usersInRoom[roomId]?.length || 0;
-        socket.emit("user-count", count);
-    });
-
-    // Handle user joining the room
-    socket.on("join-room", (roomId) => {
+    socket.on("join-room", (roomId, userId) => {
         if (!usersInRoom[roomId]) {
             usersInRoom[roomId] = [];
         }
-
-        if (usersInRoom[roomId].length >= MAX_USERS) {
-            socket.emit("room-full");
-            return;
-        }
-
-        usersInRoom[roomId].push(socket.id);
+        usersInRoom[roomId].push(userId);
         socket.join(roomId);
-        io.to(roomId).emit("user-connected", socket.id);
-        console.log(`User ${socket.id} joined room ${roomId}. Current users:`, usersInRoom[roomId]);
+        io.to(roomId).emit("user-connected", userId);
 
-        // Notify users when someone leaves
         socket.on("disconnect", () => {
-            usersInRoom[roomId] = usersInRoom[roomId].filter(id => id !== socket.id);
-            io.to(roomId).emit("user-disconnected", socket.id);
-            console.log(`User ${socket.id} left room ${roomId}. Remaining users:`, usersInRoom[roomId]);
+            usersInRoom[roomId] = usersInRoom[roomId].filter(id => id !== userId);
+            io.to(roomId).emit("user-disconnected", userId);
         });
     });
 
-    // Handle WebRTC signaling
-    socket.on("offer", (roomId, offer) => {
-        socket.broadcast.to(roomId).emit("offer", offer, socket.id);
+    socket.on("offer", (roomId, offer, userId) => {
+        socket.broadcast.to(roomId).emit("offer", offer, userId);
     });
 
-    socket.on("answer", (roomId, answer) => {
-        socket.broadcast.to(roomId).emit("answer", answer, socket.id);
+    socket.on("answer", (roomId, answer, userId) => {
+        socket.broadcast.to(roomId).emit("answer", answer, userId);
     });
 
-    socket.on("candidate", (roomId, candidate) => {
-        socket.broadcast.to(roomId).emit("candidate", candidate, socket.id);
+    socket.on("candidate", (roomId, candidate, userId) => {
+        socket.broadcast.to(roomId).emit("candidate", candidate, userId);
     });
 
-    // Handle chat messages
     socket.on("chat-message", (roomId, message) => {
         socket.broadcast.to(roomId).emit("chat-message", "User", message);
     });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, "0.0.0.0", () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
