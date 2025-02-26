@@ -54,8 +54,11 @@ document.addEventListener("DOMContentLoaded", () => {
         localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
         
         peerConnection.ontrack = (event) => {
-            addVideoStream(userId, event.streams[0]);
-        };
+    if (!document.getElementById(userId)) {
+        addVideoStream(userId, event.streams[0]);
+    }
+};
+
         
         peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
@@ -82,18 +85,22 @@ document.addEventListener("DOMContentLoaded", () => {
             addVideoStream(userId, event.streams[0]);
         };
         
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket.emit("candidate", roomId, event.candidate, socket.id);
-            }
-        };
+       peerConnection.onicecandidate = (event) => {
+    if (event.candidate) {
+        socket.emit("candidate", roomId, event.candidate, userId);
+    }
+};
+
         
-        peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
-            .then(() => peerConnection.createAnswer())
-            .then(answer => peerConnection.setLocalDescription(answer))
-            .then(() => {
-                socket.emit("answer", roomId, peerConnection.localDescription, socket.id);
-            });
+       peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
+    .then(() => peerConnection.createAnswer())
+    .then(answer => {
+        return peerConnection.setLocalDescription(answer);
+    })
+    .then(() => {
+        socket.emit("answer", roomId, peerConnection.localDescription, userId);
+    });
+
     });
     
     socket.on("answer", (answer, userId) => {
@@ -101,8 +108,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     
     socket.on("candidate", (candidate, userId) => {
-        peerConnections[userId]?.addIceCandidate(new RTCIceCandidate(candidate));
-    });
+    peerConnections[userId]?.addIceCandidate(new RTCIceCandidate(candidate));
+});
+
     
     socket.on("user-disconnected", (userId) => {
         if (peerConnections[userId]) {
