@@ -1,9 +1,8 @@
 const socket = io("https://vedio-app-k92u.onrender.com"); // Your server URL
 
 let localStream;
+let screenStream = null;
 let peerConnections = {};
-
-const MAX_USERS = 4; // Limit to 4 users
 const videoGrid = document.getElementById("video-grid");
 const chatBox = document.getElementById("chatBox");
 const chatInput = document.getElementById("chatInput");
@@ -12,17 +11,14 @@ const sendButton = document.getElementById("sendButton");
 // Call Controls
 const toggleMicBtn = document.getElementById("toggleMic");
 const toggleVideoBtn = document.getElementById("toggleVideo");
+const shareScreenBtn = document.getElementById("shareScreen");
 const endCallBtn = document.getElementById("endCall");
 
 const roomId = "myRoom";
 
 const config = {
     iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:stun3.l.google.com:19302" },
-        { urls: "stun:stun4.l.google.com" }
+        { urls: "stun:stun.l.google.com:19302" }
     ]
 };
 
@@ -31,7 +27,7 @@ async function startCamera() {
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         addVideoStream("local", localStream);
-        socket.emit("join-room", roomId);
+        socket.emit("join-room", roomId, socket.id);
     } catch (error) {
         console.error("Error accessing camera/microphone:", error);
         alert("Failed to access camera/microphone. Please check permissions.");
@@ -40,7 +36,8 @@ async function startCamera() {
 
 // Add Video Stream
 function addVideoStream(id, stream) {
-    if (!document.getElementById(id)) {
+    let existingVideo = document.getElementById(id);
+    if (!existingVideo) {
         let video = document.createElement("video");
         video.srcObject = stream;
         video.autoplay = true;
@@ -49,8 +46,8 @@ function addVideoStream(id, stream) {
     }
 }
 
-// Handle User Connection
-socket.on("user-connected", (userId) => {
+// Connect to a New User
+function connectToNewUser(userId) {
     const peerConnection = new RTCPeerConnection(config);
     peerConnections[userId] = peerConnection;
 
@@ -62,15 +59,20 @@ socket.on("user-connected", (userId) => {
 
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-            socket.emit("candidate", roomId, event.candidate);
+            socket.emit("candidate", roomId, event.candidate, socket.id);
         }
     };
 
     peerConnection.createOffer().then((offer) => {
         return peerConnection.setLocalDescription(offer);
     }).then(() => {
-        socket.emit("offer", roomId, peerConnection.localDescription);
+        socket.emit("offer", roomId, peerConnection.localDescription, socket.id);
     });
+}
+
+// Handle User Connection
+socket.on("user-connected", (userId) => {
+    connectToNewUser(userId);
 });
 
 // Handle Offer
@@ -86,7 +88,7 @@ socket.on("offer", (offer, userId) => {
 
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-            socket.emit("candidate", roomId, event.candidate);
+            socket.emit("candidate", roomId, event.candidate, socket.id);
         }
     };
 
@@ -95,7 +97,7 @@ socket.on("offer", (offer, userId) => {
     }).then((answer) => {
         return peerConnection.setLocalDescription(answer);
     }).then(() => {
-        socket.emit("answer", roomId, peerConnection.localDescription);
+        socket.emit("answer", roomId, peerConnection.localDescription, socket.id);
     });
 });
 
@@ -130,6 +132,35 @@ toggleVideoBtn.onclick = () => {
     const videoTrack = localStream.getVideoTracks()[0];
     videoTrack.enabled = !videoTrack.enabled;
     toggleVideoBtn.innerHTML = videoTrack.enabled ? "Stop Video" : "Start Video";
+};
+
+// Share Screen
+shareScreenBtn.onclick = async () => {
+    try {
+        screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        addVideoStream("screen", screenStream);
+
+        Object.values(peerConnections).forEach((peerConnection) => {
+            peerConnection.getSenders().forEach((sender) => {
+                if (sender.track.kind === "video") {
+                    sender.replaceTrack(screenStream.getTracks()[0]);
+                }
+            });
+        });
+
+        screenStream.getVideoTracks()[0].onended = () => {
+            Object.values(peerConnections).forEach((peerConnection) => {
+                peerConnection.getSenders().forEach((sender) => {
+                    if (sender.track.kind === "video") {
+                        sender.replaceTrack(localStream.getVideoTracks()[0]);
+                    }
+                });
+            });
+            document.getElementById("screen")?.remove();
+        };
+    } catch (error) {
+        console.error("Error sharing screen:", error);
+    }
 };
 
 // End Call
