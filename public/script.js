@@ -43,8 +43,25 @@ document.addEventListener("DOMContentLoaded", () => {
         let video = document.createElement("video");
         video.srcObject = stream;
         video.autoplay = true;
+        video.playsInline = true;
         video.setAttribute("id", id);
+
+        video.onloadedmetadata = () => {
+            video.play().catch(error => console.error("Video play error:", error));
+        };
+
         videoGrid.appendChild(video);
+        adjustVideoGrid(); // Ensure proper grid layout
+    }
+
+    function adjustVideoGrid() {
+        let videos = document.querySelectorAll("#video-grid video");
+        let numVideos = videos.length;
+        let gridSize = Math.ceil(Math.sqrt(numVideos));
+
+        videoGrid.style.display = "grid";
+        videoGrid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+        videoGrid.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`;
     }
 
     function connectToNewUser(userId) {
@@ -83,7 +100,9 @@ document.addEventListener("DOMContentLoaded", () => {
         localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
         peerConnection.ontrack = (event) => {
-            addVideoStream(userId, event.streams[0]);
+            if (!document.getElementById(userId)) {
+                addVideoStream(userId, event.streams[0]);
+            }
         };
 
         peerConnection.onicecandidate = (event) => {
@@ -105,7 +124,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     socket.on("candidate", (candidate, userId) => {
-        peerConnections[userId]?.addIceCandidate(new RTCIceCandidate(candidate));
+        if (peerConnections[userId] && peerConnections[userId].remoteDescription) {
+            peerConnections[userId].addIceCandidate(new RTCIceCandidate(candidate))
+                .catch(error => console.error("Error adding ICE candidate:", error));
+        }
     });
 
     socket.on("user-disconnected", (userId) => {
@@ -113,6 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
             peerConnections[userId].close();
             delete peerConnections[userId];
             document.getElementById(userId)?.remove();
+            adjustVideoGrid(); // Recalculate grid after removing user
         }
     });
 
