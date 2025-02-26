@@ -56,14 +56,26 @@
             overflow-y: auto;
         }
 
-        #video-grid {
-            display: grid;
-            gap: 10px;
-            width: 100%;
-            justify-content: center;
-            align-items: center;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        }
+       #video-grid {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+    justify-content: center;
+    align-items: center;
+    
+    /* Default to 2x2 grid for up to 4 participants */
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    
+    /* Ensure each video takes equal space */
+    height: 100%;
+}
+
+        @media (min-width: 800px) {
+    #video-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+}
 
         video {
             width: 100%;
