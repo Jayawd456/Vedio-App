@@ -47,7 +47,7 @@ document.addEventListener("DOMContentLoaded", () => {
         videoGrid.appendChild(video);
     }
 
-    function connectToNewUser(userId) {
+    function connectToNewUser(userId, userStream) {
         if (peerConnections[userId]) return; 
 
         const peerConnection = new RTCPeerConnection(config);
@@ -56,9 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
         localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
         peerConnection.ontrack = (event) => {
-            if (!document.getElementById(userId)) {
-                addVideoStream(userId, event.streams[0]);
-            }
+            addVideoStream(userId, event.streams[0]);
         };
 
         peerConnection.onicecandidate = (event) => {
@@ -74,16 +72,16 @@ document.addEventListener("DOMContentLoaded", () => {
             });
     }
 
-    socket.on("user-connected", (userId) => {
-        connectToNewUser(userId);
-    });
-
     socket.on("all-users", (users) => {
         users.forEach(userId => {
             if (userId !== socket.id) {
                 connectToNewUser(userId);
             }
         });
+    });
+
+    socket.on("user-connected", (userId) => {
+        connectToNewUser(userId);
     });
 
     socket.on("offer", (offer, userId) => {
@@ -139,34 +137,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const videoTrack = localStream.getVideoTracks()[0];
             videoTrack.enabled = !videoTrack.enabled;
             toggleVideoBtn.innerHTML = videoTrack.enabled ? "Stop Video" : "Start Video";
-        }
-    };
-
-    shareScreenBtn.onclick = async () => {
-        try {
-            screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-            addVideoStream(socket.id + "-screen", screenStream);
-
-            Object.values(peerConnections).forEach(peerConnection => {
-                peerConnection.getSenders().forEach(sender => {
-                    if (sender.track.kind === "video") {
-                        sender.replaceTrack(screenStream.getTracks()[0]);
-                    }
-                });
-            });
-
-            screenStream.getVideoTracks()[0].onended = () => {
-                Object.values(peerConnections).forEach(peerConnection => {
-                    peerConnection.getSenders().forEach(sender => {
-                        if (sender.track.kind === "video") {
-                            sender.replaceTrack(localStream.getVideoTracks()[0]);
-                        }
-                    });
-                });
-                document.getElementById(socket.id + "-screen")?.remove();
-            };
-        } catch (error) {
-            console.error("Error sharing screen:", error);
         }
     };
 
