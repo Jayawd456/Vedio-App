@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function addVideoStream(id, stream) {
         let existingVideo = document.getElementById(id);
-        if (existingVideo) return;
+        if (existingVideo) return; 
 
         let video = document.createElement("video");
         video.srcObject = stream;
@@ -47,9 +47,46 @@ document.addEventListener("DOMContentLoaded", () => {
         videoGrid.appendChild(video);
     }
 
-    function connectToNewUser(userId, offer = null) {
-        if (peerConnections[userId]) return;
+    function connectToNewUser(userId) {
+        if (peerConnections[userId]) return; 
 
+        const peerConnection = new RTCPeerConnection(config);
+        peerConnections[userId] = peerConnection;
+
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+        peerConnection.ontrack = (event) => {
+            if (!document.getElementById(userId)) {
+                addVideoStream(userId, event.streams[0]);
+            }
+        };
+
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                socket.emit("candidate", roomId, event.candidate, socket.id);
+            }
+        };
+
+        peerConnection.createOffer()
+            .then(offer => peerConnection.setLocalDescription(offer))
+            .then(() => {
+                socket.emit("offer", roomId, peerConnection.localDescription, socket.id);
+            });
+    }
+
+    socket.on("user-connected", (userId) => {
+        connectToNewUser(userId);
+    });
+
+    socket.on("all-users", (users) => {
+        users.forEach(userId => {
+            if (userId !== socket.id) {
+                connectToNewUser(userId);
+            }
+        });
+    });
+
+    socket.on("offer", (offer, userId) => {
         const peerConnection = new RTCPeerConnection(config);
         peerConnections[userId] = peerConnection;
 
@@ -61,32 +98,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
         peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
-                socket.emit("candidate", roomId, event.candidate, socket.id);
+                socket.emit("candidate", roomId, event.candidate, userId);
             }
         };
 
-        if (offer) {
-            peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
-                .then(() => peerConnection.createAnswer())
-                .then(answer => peerConnection.setLocalDescription(answer))
-                .then(() => {
-                    socket.emit("answer", roomId, peerConnection.localDescription, userId);
-                });
-        } else {
-            peerConnection.createOffer()
-                .then(offer => peerConnection.setLocalDescription(offer))
-                .then(() => {
-                    socket.emit("offer", roomId, peerConnection.localDescription, socket.id);
-                });
-        }
-    }
-
-    socket.on("user-connected", (userId) => {
-        connectToNewUser(userId);
-    });
-
-    socket.on("offer", (offer, userId) => {
-        connectToNewUser(userId, offer);
+        peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
+            .then(() => peerConnection.createAnswer())
+            .then(answer => peerConnection.setLocalDescription(answer))
+            .then(() => {
+                socket.emit("answer", roomId, peerConnection.localDescription, userId);
+            });
     });
 
     socket.on("answer", (answer, userId) => {
@@ -124,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
     shareScreenBtn.onclick = async () => {
         try {
             screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-            addVideoStream("screen-" + socket.id, screenStream);
+            addVideoStream(socket.id + "-screen", screenStream);
 
             Object.values(peerConnections).forEach(peerConnection => {
                 peerConnection.getSenders().forEach(sender => {
@@ -142,7 +163,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         }
                     });
                 });
-                document.getElementById("screen-" + socket.id)?.remove();
+                document.getElementById(socket.id + "-screen")?.remove();
             };
         } catch (error) {
             console.error("Error sharing screen:", error);
