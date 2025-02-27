@@ -10,7 +10,7 @@ const io = socketIo(server, { cors: { origin: "*" } });
 app.use(cors());
 app.use(express.static("public"));
 
-const usersInRoom = {};
+const usersInRoom = {}; 
 
 io.on("connection", (socket) => {
     console.log("New user connected:", socket.id);
@@ -22,6 +22,7 @@ io.on("connection", (socket) => {
         usersInRoom[roomId].push(userId);
         socket.join(roomId);
 
+        socket.emit("all-users", usersInRoom[roomId]);
         io.to(roomId).emit("user-connected", userId);
 
         socket.on("disconnect", () => {
@@ -47,5 +48,4 @@ io.on("connection", (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(3000, () => console.log("Server running on port 3000"));
