@@ -10,7 +10,7 @@ const io = socketIo(server, { cors: { origin: "*" } });
 app.use(cors());
 app.use(express.static("public"));
 
-const usersInRoom = {}; // Track users in each room
+const usersInRoom = {};
 
 io.on("connection", (socket) => {
     console.log("New user connected:", socket.id);
@@ -21,6 +21,7 @@ io.on("connection", (socket) => {
         }
         usersInRoom[roomId].push(userId);
         socket.join(roomId);
+
         io.to(roomId).emit("user-connected", userId);
 
         socket.on("disconnect", () => {
