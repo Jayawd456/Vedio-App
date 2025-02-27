@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => { 
+document.addEventListener("DOMContentLoaded", () => {
     const socket = io("https://vedio-app-k92u.onrender.com");
 
     let localStream;
@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
     async function startCamera() {
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            addVideoStream(socket.id, localStream);
+            addVideoStream("local", localStream);
             socket.emit("join-room", roomId, socket.id);
         } catch (error) {
             console.error("Error accessing camera/microphone:", error);
@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function addVideoStream(id, stream) {
         let existingVideo = document.getElementById(id);
-        if (existingVideo) return; 
+        if (existingVideo) return; // Prevent duplicates
 
         let video = document.createElement("video");
         video.srcObject = stream;
@@ -47,8 +47,8 @@ document.addEventListener("DOMContentLoaded", () => {
         videoGrid.appendChild(video);
     }
 
-    function connectToNewUser(userId, userStream) {
-        if (peerConnections[userId]) return; 
+    function connectToNewUser(userId) {
+        if (peerConnections[userId]) return; // Prevent duplicate connections
 
         const peerConnection = new RTCPeerConnection(config);
         peerConnections[userId] = peerConnection;
@@ -56,7 +56,9 @@ document.addEventListener("DOMContentLoaded", () => {
         localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
         peerConnection.ontrack = (event) => {
-            addVideoStream(userId, event.streams[0]);
+            if (!document.getElementById(userId)) {
+                addVideoStream(userId, event.streams[0]);
+            }
         };
 
         peerConnection.onicecandidate = (event) => {
@@ -72,17 +74,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
     }
 
-    socket.on("all-users", (users) => {
-        users.forEach(userId => {
-            if (userId !== socket.id) {
-                connectToNewUser(userId);
-            }
-        });
-    });
-
-    socket.on("user-connected", (userId) => {
-        connectToNewUser(userId);
-    });
+    socket.on("user-connected", (userId) => connectToNewUser(userId));
 
     socket.on("offer", (offer, userId) => {
         const peerConnection = new RTCPeerConnection(config);
@@ -137,6 +129,34 @@ document.addEventListener("DOMContentLoaded", () => {
             const videoTrack = localStream.getVideoTracks()[0];
             videoTrack.enabled = !videoTrack.enabled;
             toggleVideoBtn.innerHTML = videoTrack.enabled ? "Stop Video" : "Start Video";
+        }
+    };
+
+    shareScreenBtn.onclick = async () => {
+        try {
+            screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            addVideoStream("screen", screenStream);
+
+            Object.values(peerConnections).forEach(peerConnection => {
+                peerConnection.getSenders().forEach(sender => {
+                    if (sender.track.kind === "video") {
+                        sender.replaceTrack(screenStream.getTracks()[0]);
+                    }
+                });
+            });
+
+            screenStream.getVideoTracks()[0].onended = () => {
+                Object.values(peerConnections).forEach(peerConnection => {
+                    peerConnection.getSenders().forEach(sender => {
+                        if (sender.track.kind === "video") {
+                            sender.replaceTrack(localStream.getVideoTracks()[0]);
+                        }
+                    });
+                });
+                document.getElementById("screen")?.remove();
+            };
+        } catch (error) {
+            console.error("Error sharing screen:", error);
         }
     };
 
