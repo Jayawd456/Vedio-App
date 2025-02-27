@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", () => { 
     const socket = io("https://vedio-app-k92u.onrender.com");
 
     let localStream;
@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
     async function startCamera() {
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            addVideoStream("local", localStream);
+            addVideoStream(socket.id, localStream);
             socket.emit("join-room", roomId, socket.id);
         } catch (error) {
             console.error("Error accessing camera/microphone:", error);
@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function addVideoStream(id, stream) {
         let existingVideo = document.getElementById(id);
-        if (existingVideo) return; // Prevent duplicates
+        if (existingVideo) return;
 
         let video = document.createElement("video");
         video.srcObject = stream;
@@ -47,36 +47,9 @@ document.addEventListener("DOMContentLoaded", () => {
         videoGrid.appendChild(video);
     }
 
-    function connectToNewUser(userId) {
-        if (peerConnections[userId]) return; // Prevent duplicate connections
+    function connectToNewUser(userId, offer = null) {
+        if (peerConnections[userId]) return;
 
-        const peerConnection = new RTCPeerConnection(config);
-        peerConnections[userId] = peerConnection;
-
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-        peerConnection.ontrack = (event) => {
-            if (!document.getElementById(userId)) {
-                addVideoStream(userId, event.streams[0]);
-            }
-        };
-
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket.emit("candidate", roomId, event.candidate, socket.id);
-            }
-        };
-
-        peerConnection.createOffer()
-            .then(offer => peerConnection.setLocalDescription(offer))
-            .then(() => {
-                socket.emit("offer", roomId, peerConnection.localDescription, socket.id);
-            });
-    }
-
-    socket.on("user-connected", (userId) => connectToNewUser(userId));
-
-    socket.on("offer", (offer, userId) => {
         const peerConnection = new RTCPeerConnection(config);
         peerConnections[userId] = peerConnection;
 
@@ -88,16 +61,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
         peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
-                socket.emit("candidate", roomId, event.candidate, userId);
+                socket.emit("candidate", roomId, event.candidate, socket.id);
             }
         };
 
-        peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
-            .then(() => peerConnection.createAnswer())
-            .then(answer => peerConnection.setLocalDescription(answer))
-            .then(() => {
-                socket.emit("answer", roomId, peerConnection.localDescription, userId);
-            });
+        if (offer) {
+            peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
+                .then(() => peerConnection.createAnswer())
+                .then(answer => peerConnection.setLocalDescription(answer))
+                .then(() => {
+                    socket.emit("answer", roomId, peerConnection.localDescription, userId);
+                });
+        } else {
+            peerConnection.createOffer()
+                .then(offer => peerConnection.setLocalDescription(offer))
+                .then(() => {
+                    socket.emit("offer", roomId, peerConnection.localDescription, socket.id);
+                });
+        }
+    }
+
+    socket.on("user-connected", (userId) => {
+        connectToNewUser(userId);
+    });
+
+    socket.on("offer", (offer, userId) => {
+        connectToNewUser(userId, offer);
     });
 
     socket.on("answer", (answer, userId) => {
@@ -135,7 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
     shareScreenBtn.onclick = async () => {
         try {
             screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-            addVideoStream("screen", screenStream);
+            addVideoStream("screen-" + socket.id, screenStream);
 
             Object.values(peerConnections).forEach(peerConnection => {
                 peerConnection.getSenders().forEach(sender => {
@@ -153,7 +142,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         }
                     });
                 });
-                document.getElementById("screen")?.remove();
+                document.getElementById("screen-" + socket.id)?.remove();
             };
         } catch (error) {
             console.error("Error sharing screen:", error);
